@@ -234,7 +234,10 @@ async def chat_stream(request: Request):
             status_code=400
         )
 
-    agent = get_agent(selected_model)
+    try:
+        agent = get_agent(selected_model)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=503)
 
     create_or_update_conversation(thread_id, user_message)
     save_chat_message(thread_id, "user", user_message)

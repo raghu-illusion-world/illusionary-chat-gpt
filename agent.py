@@ -10,7 +10,7 @@ load_dotenv()
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
 
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage
 from langgraph.graph import StateGraph, START, MessagesState
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -21,9 +21,9 @@ Path("data").mkdir(exist_ok=True)
 
 
 # Keep the default configurable for deployments with different model access.
-DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip() or "gemini-3.8-flash"
+DEFAULT_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b").strip() or "openai/gpt-oss-120b"
 
-ALLOWED_MODELS = {"gemini-3.8-flash", DEFAULT_MODEL}
+ALLOWED_MODELS = {"openai/gpt-oss-120b", "openai/gpt-oss-20b", DEFAULT_MODEL}
 
 
 SYSTEM_PROMPT = """
@@ -71,16 +71,18 @@ def normalize_model_name(model_name: str | None) -> str:
 
 def build_agent(model_name: str):
     """
-    Build one LangGraph agent for a selected Gemini model.
+    Build one LangGraph agent for a selected Groq model.
     """
 
     selected_model = normalize_model_name(model_name)
 
-    # Initialize ChatGoogleGenerativeAI
-    llm = ChatGoogleGenerativeAI(
+    # Initialize Groq using GROQ_API_KEY from the environment.
+    llm = ChatGroq(
         model=selected_model,
         temperature=0.3,
-        streaming=True
+        streaming=True,
+        timeout=45,
+        max_retries=0,
     )
 
     llm_with_tools = llm.bind_tools(tools)

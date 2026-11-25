@@ -516,7 +516,8 @@
             ></textarea>
 
             <select id="modelSelect" class="model-select" title="Select model">
-                <option value="gemini-3.8-flash">gemini-3.8-flash</option>
+                <option value="openai/gpt-oss-120b">Groq · GPT OSS 120B</option>
+                <option value="openai/gpt-oss-20b">Groq · GPT OSS 20B</option>
             </select>
 
             <button class="mic-btn" id="micBtn" onclick="toggleDictation()" title="Dictate">
@@ -947,7 +948,7 @@
             stopDictation();
         }
 
-        const selectedModel = modelSelect ? modelSelect.value : "gemini-3.8-flash";
+        const selectedModel = modelSelect ? modelSelect.value : "openai/gpt-oss-120b";
 
         addMessage("user", message);
 
@@ -1006,8 +1007,17 @@
             }
         }
 
+        const controller = new AbortController();
+        const resetStreamTimeout = () => {
+            clearTimeout(streamTimeout);
+            streamTimeout = setTimeout(() => controller.abort(), 60000);
+        };
+        let streamTimeout;
+        resetStreamTimeout();
+
         try {
             const response = await fetch("/chat/stream", {
+                signal: controller.signal,
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -1024,7 +1034,7 @@
 
                 try {
                     const errorData = await response.json();
-                    errorText = errorData.detail || errorData.message || errorText;
+                    errorText = errorData.error || errorData.detail || errorData.message || errorText;
                 } catch (error) {
                     console.error("Could not parse error response:", error);
                 }
@@ -1050,6 +1060,7 @@
                     break;
                 }
 
+                resetStreamTimeout();
                 buffer += decoder.decode(value, { stream: true });
 
                 const parts = buffer.split(/\r?\n\r?\n/);
@@ -1081,9 +1092,13 @@
                 completeToolProgress(toolProgress, likelyTool);
             }
 
-            botElement.textContent = "Something went wrong: " + error.message;
+            const errorMessage = error.name === "AbortError"
+                ? "No response received for 60 seconds. Please retry and check the server terminal for the Groq API error."
+                : "Something went wrong: " + error.message;
+            botElement.textContent += "\n\n" + errorMessage;
 
         } finally {
+            clearTimeout(streamTimeout);
             sendBtn.disabled = false;
             statusText.textContent = "Ready";
             messageInput.focus();
